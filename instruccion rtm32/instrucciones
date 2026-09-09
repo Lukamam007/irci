@@ -1,0 +1,486 @@
+# Instrucciones-de-la-maquina-rtm32-Luca-Mamani
+
+# Caso 1:
+## Descripción: Testeo de ADDI, ADD y SUB encadenados.
+## Instrucciones: 
+1. `ADDI $10, $0, 20`
+2. `ADD $11, $10, $10`
+3. `SUB $12, $11, $10`
+
+## Precondiciones: 
+- El registro $0 siempre vale 0 por diseño de hardware.
+- Setear el PC en la dirección 0.
+- Comandos en el debugger:
+> set pc 0
+
+## Code
+Traducción a Hexadecimal según el formato R e I:
+- `ADDI $10, $0, 20`: `0x08140014`
+- `ADD $11, $10, $10`: `0x0294B01C`
+- `SUB $12, $11, $10`: `0x02D4C01D`
+
+Comandos en el debugger:
+> set [0x00000000] 0x08140014
+> set [0x00000004] 0x0294B01C
+> set [0x00000008] 0x02D4C01D
+> step 3
+
+## Postcondiciones: 
+- Ejecutar el comando `registers`.
+- R10 debe valer 0x00000014 (20 decimal).
+- R11 debe valer 0x00000028 (40 decimal).
+- R12 debe valer 0x00000014 (20 decimal).
+
+## Conclusiones: 
+Anduvo perfectamente. Las tres operaciones aritméticas se resolvieron respetando los operandos y el destino sin afectar a otros registros.
+
+
+# Caso 2:
+## Descripción: Testeo de las compuertas lógicas AND, OR y XOR.
+## Instrucciones: 
+1. `AND $12, $10, $11`
+2. `OR $13, $10, $11`
+3. `XOR $14, $10, $11`
+
+## Precondiciones: 
+- Inyectar valores binarios conocidos en R10 y R11 para poder verificar el comportamiento de las compuertas lógicas bit a bit.
+- Comandos en el debugger:
+> set r10 0x000F
+> set r11 0x0033
+> set pc 0
+
+## Code
+Traducción a Hexadecimal:
+- `AND $12, $10, $11`: `0x0296C008`
+- `OR $13, $10, $11`: `0x0296D009`
+- `XOR $14, $10, $11`: `0x0296E00A`
+
+Comandos en el debugger:
+> set [0x00000000] 0x0296C008
+> set [0x00000004] 0x0296D009
+> set [0x00000008] 0x0296E00A
+> step 3
+
+## Postcondiciones: 
+- Ejecutar `registers`.
+- R12 (AND) debe valer `0x00000003`.
+- R13 (OR) debe valer `0x0000003F`.
+- R14 (XOR) debe valer `0x0000003C`.
+
+## Conclusiones: 
+Anduvo correcto. La ALU procesó las operaciones bit a bit según la tabla de verdad de cada compuerta lógica
+
+
+# Caso 3:
+## Descripción: Testeo de las operaciones de desplazamiento SLL y SRL.
+## Instrucciones: 
+1. `SLL $11, $10, 4`
+2. `SRL $12, $10, 2` 
+
+## Precondiciones: 
+- Inicializar R10 con un valor base.
+- Comandos en el debugger:
+> set r10 0x000F
+> set pc 0
+
+## Code
+Traducción a Hexadecimal:
+- `SLL $11, $10, 4`: `0x0014B100`
+- `SRL $12, $10, 2`: `0x0014C081`
+
+Comandos en el debugger:
+> set [0x00000000] 0x0014B100
+> set [0x00000004] 0x0014C081
+> step 2
+
+## Postcondiciones: 
+- Ejecutar `registers`.
+- R11 debe valer `0x000000F0` (0x000F << 4).
+- R12 debe valer `0x00000003` (0x000F >> 2).
+
+## Conclusiones: 
+Anduvo correctamente. El barrel shifter del procesador funciona aplicando las constantes ingresadas en el campo 'aux' de las instrucciones tipo R.
+
+
+# Caso 4:
+## Descripción: Testeo de almacenamiento SW y carga LW.
+## Instrucciones: 
+1. `SW $10, $0, 0x20`
+2. `LW $11, $0, 0x20`
+
+## Precondiciones: 
+- Cargar un valor hexadecimal reconocible en R10. Asegurarse de que R11 esté vacío.
+- Comandos en el debugger:
+> set r10 0xDEADBEEF
+> set r11 0
+> set pc 0
+
+## Code
+Traducción a Hexadecimal:
+- `SW $10, $0, 0x20`: `0x48140020`
+- `LW $11, $0, 0x20`: `0x40160020`
+
+Comandos en el debugger:
+> set [0x00000000] 0x48140020
+> set [0x00000004] 0x40160020
+> step 2
+
+## Postcondiciones: 
+- Revisar que la memoria en 0x20 contiene el valor ejecutando `examine 0x20` o volcándolo con `dump hex 0x20 +4`.
+- Revisar que el registro R11 ahora contiene exactamente `0xDEADBEEF`.
+
+## Conclusiones: 
+Anduvo. La memoria de usuario responde bien tanto a la escritura indexada como a la lectura, devolviendo la palabra exacta.
+
+
+# Caso 5:
+## Descripción: Testeo de las instrucciones de bifurcación BEQ y BNE .
+## Instrucciones: 
+1. `BEQ $10, $11, 2`.
+
+## Precondiciones: 
+- R10 y R11 deben ser inicializados con el mismo valor para que la condición BEQ evalúe a verdadero (true).
+- Comandos en el debugger:
+> set r10 1
+> set r11 1
+> set pc 0
+
+## Code
+Traducción a Hexadecimal:
+- `BEQ $10, $11, 2`: `0x82960002`
+
+Comandos en el debugger:
+> set [0x00000000] 0x82960002
+> step 1
+
+## Postcondiciones: 
+- El cálculo de la dirección de salto del RTM32 responde a la fórmula PC = PC + 4 + (imm * 4). Si el PC inicial era 0 y el offset inmediato es 2, el nuevo PC debería ser: 0 + 4 + 8 = 12 (0x0C).
+- Al ejecutar `registers`, el valor del registro especial `PC` debe ser `0x0000000C`.
+
+## Conclusiones: 
+Anduvo perfectamente. La instrucción evaluó la comparación correctamente y la unidad de control modificó el flujo lineal del programa actualizando el registro contador de programa (PC) al destino calculado.
+
+# Caso 6:
+## Descripción: Testeo de LUI , ORI y ANDI para manipular valores de 32 bits y máscaras lógicas.
+## Instrucciones: 
+1. `LUI $10, 0x1234`.
+2. `ORI $10, $10, 0x5678`.
+3. `ANDI $11, $10, 0x00FF`.
+
+## Precondiciones: 
+- Ninguna específica, los registros se sobreescriben con las constantes.
+- Comandos en el debugger:
+> set pc 0
+
+## Code
+Traducción a Hexadecimal según el formato L (incluyendo el bit 'h' en 0):
+- `LUI $10, 0x1234`: `0x38141234`
+- `ORI $10, $10, 0x5678`: `0x29545678`
+- `ANDI $11, $10, 0x00FF`: `0x215600FF`
+
+Comandos en el debugger:
+> set [0x00000000] 0x38141234
+> set [0x00000004] 0x29545678
+> set [0x00000008] 0x215600FF
+> step 3
+
+## Postcondiciones: 
+- Al ejecutar `registers`, R10 debe contener `0x12345678`.
+- R11 debe contener `0x00000078`, ya que la máscara ANDI solo dejó pasar los últimos 8 bits.
+
+## Conclusiones: 
+Anduvo correctamente. Las instrucciones de formato L interpretan bien el bit 'h' y concatenan o extienden los ceros según lo especificado en la tabla de operaciones lógicas de la arquitectura.
+
+
+# Caso 7:
+## Descripción: Testeo de la ALU para operaciones complejas.
+## Instrucciones: 
+1. `MUL $12, $10, $11`.
+2. `DIV $13, $10, $11`.
+3. `REST $14, $10, $11`.
+
+## Precondiciones: 
+- Cargar un dividendo en R10 y un divisor en R11.
+- Comandos en el debugger:
+> set r10 20
+> set r11 5
+> set pc 0
+
+## Code
+Traducción a Hexadecimal (formato R):
+- `MUL $12, $10, $11`: `0x0296C015`
+- `DIV $13, $10, $11`: `0x0296D018`
+- `REST $14, $10, $11`: `0x0296E01A`
+
+Comandos en el debugger:
+> set [0x00000000] 0x0296C015
+> set [0x00000004] 0x0296D018
+> set [0x00000008] 0x0296E01A
+> step 3
+
+## Postcondiciones: 
+- Ejecutar `registers`.
+- R12 debe valer `0x00000064`.
+- R13 debe valer `0x00000004`.
+- R14 debe valer `0x00000000`.
+
+## Conclusiones: 
+Anduvo perfectamente. Las operaciones aritméticas de multiplicación y división operan sobre los registros enteros de forma esperada.
+
+
+# Caso 8:
+## Descripción: Testeo de comparaciones condicionales entre registros (SLT) y contra un inmediato (SLTI). Devuelven 1 si es menor, y 0 si es mayor o igual.
+## Instrucciones: 
+1. `SLT $12, $10, $11`.
+2. `SLTI $13, $11, 10`.
+
+## Precondiciones: 
+- Comandos en el debugger:
+> set r10 10
+> set r11 20
+> set pc 0
+
+## Code
+Traducción a Hexadecimal:
+- `SLT $12, $10, $11`: `0x0296C00C`
+- `SLTI $13, $11, 10`: `0xB2DA000A`
+
+Comandos en el debugger:
+> set [0x00000000] 0x0296C00C
+> set [0x00000004] 0xB2DA000A
+> step 2
+
+## Postcondiciones: 
+- R12 debe valer `0x00000001`.
+- R13 debe valer `0x00000000`.
+
+## Conclusiones: 
+Anduvo correctamente. SLT y SLTI evalúan matemáticamente los operandos y actualizan el registro destino funcionando como flags booleanos.
+
+
+# Caso 9:
+## Descripción: Testeo de alteración manual del flujo del programa mediante J y JR.
+## Instrucciones: 
+1. `J 4`.
+2. `JR $10`.
+
+## Precondiciones: 
+- Cargar la dirección de retorno en R10.
+- Comandos en el debugger:
+> set r10 0x24
+> set pc 0
+
+## Code
+Traducción a Hexadecimal:
+- `J 4`: `0x10000004`
+- `JR $10`: `0x0140000E`
+
+Comandos en el debugger:
+> set [0x00000000] 0x10000004
+> set [0x00000010] 0x0140000E
+> step 2
+
+## Postcondiciones: 
+- Tras el primer step, el registro PC debe valer `0x00000010`.
+- Tras el segundo step, el registro PC debe valer `0x00000024`.
+
+## Conclusiones: 
+Anduvo. Se comprobó tanto el cálculo de dirección truncada del formato J como el direccionamiento directo del registro PC desde la ALU mediante la instrucción JR.
+
+
+# Caso 10:
+## Descripción: Testeo de almacenamiento SB y lectura de byte sin signo LBU.
+## Instrucciones: 
+1. `SB $10, $0, 0x50`.
+2. `LBU $11, $0, 0x50`.
+
+## Precondiciones: 
+- Cargar un valor de prueba en R10 y vaciar R11.
+- Comandos en el debugger:
+> set r10 0xFF
+> set r11 0
+> set pc 0
+
+## Code
+Traducción a Hexadecimal:
+- `SB $10, $0, 0x50`: `0x58140050`
+- `LBU $11, $0, 0x50`: `0x782C0050`
+
+Comandos en el debugger:
+> set [0x00000000] 0x58140050
+> set [0x00000004] 0x782C0050
+> step 2
+
+## Postcondiciones: 
+- R11 debe contener exactamente `0x000000FF`.
+- La memoria en 0x50 debe contener `FF`.
+
+## Conclusiones: 
+Anduvo correctamente. El acceso indexado para datos sub-palabra permite enmascarar automáticamente los datos interactuando correctamente con el bus del sistema.
+
+# Caso 11:
+## Descripción: Testeo de almacenamiento de media palabra y carga de medias palabras y bytes con/sin signo.
+## Instrucciones: 
+1. `SH $10, $0, 0x40`.
+2. `LH $11, $0, 0x40`.
+3. `LHU $12, $0, 0x40`.
+4. `LB $13, $0, 0x40`.
+
+## Precondiciones: 
+- Cargar un valor de prueba en R10.
+- Comandos en el debugger:
+> set r10 0xAABBCCDD
+> set pc 0
+
+## Code
+Traducción a Hexadecimal según el formato I:
+- `SH $10, $0, 0x40`: `0x50140040`
+- `LH $11, $0, 0x40`: `0x60160040`
+- `LHU $12, $0, 0x40`: `0x68180040`
+- `LB $13, $0, 0x40`: `0x701A0040`
+
+Comandos en el debugger:
+> set [0x00000000] 0x50140040
+> set [0x00000004] 0x60160040
+> set [0x00000008] 0x68180040
+> set [0x0000000C] 0x701A0040
+> step 4
+
+## Postcondiciones: 
+- Verificar la memoria con el nuevo comando del emulador: `examine /xh 0x40 1` (debe mostrar la media palabra guardada).
+- Ejecutar `registers`. R12 debe contener `0x0000CCDD` confirmando que LHU funciona correctamente rellenando con ceros.
+
+
+# Caso 12:
+## Descripción: Testeo de acceso a memoria indexado, sumando los registros base e índice.
+## Instrucciones: 
+1. `LWX $10, $1, $2`
+2. `LHX $11, $1, $2`
+3. `LHUX $12, $1, $2`
+4. `LBX $13, $1, $2`
+5. `LBUX $14, $1, $2`
+
+## Precondiciones: 
+Se indexará apuntando a la dirección de memoria 0x44 (R1 + R2).
+- Comandos en el debugger:
+> set [0x44] 0x11223344
+> set r1 0x40
+> set r2 0x04
+> set pc 0
+
+## Code
+Traducción a Hexadecimal según formato R:
+- `LWX $10, $1, $2`: `0x00542014`
+- `LHX $11, $1, $2`: `0x00562010`
+- `LHUX $12, $1, $2`: `0x00602011`
+- `LBX $13, $1, $2`: `0x006A2012`
+- `LBUX $14, $1, $2`: `0x00702013`
+
+Comandos en el debugger:
+> set [0x00] 0x00542014
+> set [0x04] 0x00562010
+> set [0x08] 0x00602011
+> set [0x0C] 0x006A2012
+> set [0x10] 0x00702013
+> step 5
+
+## Postcondiciones: 
+- El procesador debe calcular correctamente la dirección efectiva apuntando a 0x44 y cargando las fracciones de palabra correspondientes en cada registro destino.
+
+
+# Caso 13:
+## Descripción: Testeo de la familia restante de bifurcaciones condicionales (BNE, BLT, BGT, BLE, BGE).
+## Instrucciones: 
+1. `BNE $1, $2, 2` (Si R1 != R2, salta 2 palabras).
+2. `BLT $1, $2, 2` (Si R1 < R2, salta 2 palabras).
+3. `BGT $1, $2, 2` (Si R1 > R2, salta 2 palabras).
+4. `BLE $1, $2, 2` (Si R1 <= R2, salta 2 palabras).
+5. `BGE $1, $2, 2` (Si R1 >= R2, salta 2 palabras).
+
+## Precondiciones: 
+- Comandos en el debugger:
+> set r1 10
+> set r2 20
+> set pc 0
+
+## Code
+Traducción a Hexadecimal calculando los saltos relativos:
+- `BNE $1, $2, 2`: `0x88220002`
+- `BLT $1, $2, 2`: `0x90220002`
+- `BGT $1, $2, 2`: `0x98220002`
+- `BLE $1, $2, 2`: `0xA0220002`
+- `BGE $1, $2, 2`: `0xA8220002`
+
+## Postcondiciones: 
+- Probando las instrucciones individualmente en 0x00, si la condición se cumple, el registro PC saltará de 0x00 a 0x0C (PC = PC + 4 + (2*4)).
+
+
+# Caso 14:
+## Descripción: Testeo de multiplicación avanzada y operaciones de división sin signo.
+## Instrucciones: 
+1. `MULH $12, $10, $11`.
+2. `MULHU $13, $10, $11`.
+3. `DIVU $14, $10, $11`.
+4. `RESTU $15, $10, $11`.
+
+## Precondiciones: 
+- Comandos en el debugger:
+> set r10 20
+> set r11 5
+> set pc 0
+
+## Code
+Traducción a Hexadecimal:
+- `MULH $12, $10, $11`: `0x0296C016`
+- `MULHU $13, $10, $11`: `0x0296D017`
+- `DIVU $14, $10, $11`: `0x0296E019`
+- `RESTU $15, $10, $11`: `0x0296F01B`
+
+Comandos en el debugger:
+> set [0x00] 0x0296C016
+> set [0x04] 0x0296D017
+> set [0x08] 0x0296E019
+> set [0x0C] 0x0296F01B
+> step 4
+
+## Postcondiciones: 
+- R14 debe almacenar el cociente 4 exacto.
+- R15 debe almacenar el resto 0 exacto.
+
+# Caso 15:
+## Descripción: Testeo de llamadas a subrutina y funciones misceláneas restantes.
+## Instrucciones: 
+1. `JAL 8`.
+2. `JALR $31, $10`.
+3. `SRA $11, $10, 4`.
+4. `XORI $12, $10, 0xFFFF`.
+5. `NOR $13, $10, $11`.
+
+## Precondiciones: 
+- Inicializar R10 para usarlo como dirección de salto en el JALR y como operando en las lógicas.
+- Comandos en el debugger:
+> set r10 0x24
+> set pc 0
+
+## Code
+Traducción a Hexadecimal:
+- `JAL 8`: `0x18000008`
+- `JALR $31, $10`: `0x015F000F`
+- `SRA $11, $10, 4`: `0x00145902`
+- `XORI $12, $10, 0xFFFF`: `0x314CFFFF`
+- `NOR $13, $10, $11`: `0x014B680B`
+
+Comandos en el debugger:
+> set [0x00000000] 0x18000008
+> set [0x00000004] 0x015F000F
+> set [0x00000008] 0x00145902
+> set [0x0000000C] 0x314CFFFF
+> set [0x00000010] 0x014B680B
+
+## Postcondiciones: 
+- Para probar `JAL`, tras inyectarlo y hacer `step`, el registro PC debe actualizarse a `0x00000020`.
+- El registro `R31` debe actualizarse a `0x00000004`, demostrando que guarda exitosamente la dirección de retorno.
+- Tras ejecutar el resto de operaciones de forma lineal con `step`, comprobar que el comportamiento de la extensión de signo de `SRA` actúa de forma distinta a un shift lógico normal.
+
+## Conclusiones: 
+Anduvo perfectamente. Las instrucciones de enlace para subrutinas manejan correctamente el registro $31 para almacenar direcciones de retorno. Además, las compuertas faltantes del set operan bajo el estándar de la arquitectura de la CPU.
