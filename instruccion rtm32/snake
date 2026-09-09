@@ -1,0 +1,240 @@
+.section ".data"
+limpiar_pantalla: .asciiz "\x1b[2J\x1b[H"
+volver_inicio: .asciiz "\x1b[H"
+cabeza_snake: .asciiz "O"
+char_manzana: .asciiz "@"
+salto_linea: .asciiz "\r\n"
+espacio: .asciiz " "
+mensaje_fin: .asciiz "FIN DEL JUEGO"
+mensaje_win: .asciiz "GANASTE!"
+.pad 0(4)
+pos_x: .word 5
+pos_y: .word 5
+dir_x: .word 1
+dir_y: .word 0
+manzana_x: .word 30
+manzana_y: .word 10
+
+.section ".text"
+addi $sp, $zero, 0xFFC
+
+game_loop:
+    jal leer_teclado
+    beq $8, $zero, actualizar_pos
+
+check_w:
+    addi $10, $zero, 119
+    bne $8, $10, check_s
+    orh $10, $zero, .hi16 dir_x
+    ori $10, $10, .lo16 dir_x
+    sw $zero, 0($10)
+    orh $10, $zero, .hi16 dir_y
+    ori $10, $10, .lo16 dir_y
+    addi $11, $zero, -1
+    sw $11, 0($10)
+    j actualizar_pos
+
+check_s:
+    addi $10, $zero, 115
+    bne $8, $10, check_a
+    orh $10, $zero, .hi16 dir_x
+    ori $10, $10, .lo16 dir_x
+    sw $zero, 0($10)
+    orh $10, $zero, .hi16 dir_y
+    ori $10, $10, .lo16 dir_y
+    addi $11, $zero, 1
+    sw $11, 0($10)
+    j actualizar_pos
+
+check_a:
+    addi $10, $zero, 97
+    bne $8, $10, check_d
+    orh $10, $zero, .hi16 dir_y
+    ori $10, $10, .lo16 dir_y
+    sw $zero, 0($10)
+    orh $10, $zero, .hi16 dir_x
+    ori $10, $10, .lo16 dir_x
+    addi $11, $zero, -1
+    sw $11, 0($10)
+    j actualizar_pos
+
+check_d:
+    addi $10, $zero, 100
+    bne $8, $10, actualizar_pos
+    orh $10, $zero, .hi16 dir_y
+    ori $10, $10, .lo16 dir_y
+    sw $zero, 0($10)
+    orh $10, $zero, .hi16 dir_x
+    ori $10, $10, .lo16 dir_x
+    addi $11, $zero, 1
+    sw $11, 0($10)
+
+actualizar_pos:
+    orh $10, $zero, .hi16 pos_x
+    ori $10, $10, .lo16 pos_x
+    lw $11, 0($10)
+    orh $12, $zero, .hi16 dir_x
+    ori $12, $12, .lo16 dir_x
+    lw $13, 0($12)
+    add $11, $11, $13
+    
+    beq $11, $zero, game_over
+    addi $14, $zero, 70
+    beq $11, $14, game_over
+    sw $11, 0($10)
+
+    orh $10, $zero, .hi16 pos_y
+    ori $10, $10, .lo16 pos_y
+    lw $11, 0($10)
+    orh $12, $zero, .hi16 dir_y
+    ori $12, $12, .lo16 dir_y
+    lw $13, 0($12)
+    add $11, $11, $13
+    
+    beq $11, $zero, game_over
+    addi $14, $zero, 20
+    beq $11, $14, game_over
+    sw $11, 0($10)
+
+    orh $10, $zero, .hi16 pos_x
+    ori $10, $10, .lo16 pos_x
+    lw $11, 0($10)
+    orh $12, $zero, .hi16 manzana_x
+    ori $12, $12, .lo16 manzana_x
+    lw $13, 0($12)
+    bne $11, $13, dibujar
+
+    orh $10, $zero, .hi16 pos_y
+    ori $10, $10, .lo16 pos_y
+    lw $11, 0($10)
+    orh $12, $zero, .hi16 manzana_y
+    ori $12, $12, .lo16 manzana_y
+    lw $13, 0($12)
+    bne $11, $13, dibujar
+
+    j game_win
+
+dibujar:
+    orh $a0, $zero, .hi16 limpiar_pantalla
+    ori $a0, $a0, .lo16 limpiar_pantalla
+    jal imprimir_asciiz
+
+    orh $12, $zero, .hi16 manzana_y
+    ori $12, $12, .lo16 manzana_y
+    lw $13, 0($12)
+bucle_y_m:
+    beq $13, $zero, fin_y_m
+    orh $a0, $zero, .hi16 salto_linea
+    ori $a0, $a0, .lo16 salto_linea
+    jal imprimir_asciiz
+    addi $13, $13, -1
+    j bucle_y_m
+fin_y_m:
+
+    orh $10, $zero, .hi16 manzana_x
+    ori $10, $10, .lo16 manzana_x
+    lw $11, 0($10)
+bucle_x_m:
+    beq $11, $zero, fin_x_m
+    orh $a0, $zero, .hi16 espacio
+    ori $a0, $a0, .lo16 espacio
+    jal imprimir_asciiz
+    addi $11, $11, -1
+    j bucle_x_m
+fin_x_m:
+
+    orh $a0, $zero, .hi16 char_manzana
+    ori $a0, $a0, .lo16 char_manzana
+    jal imprimir_asciiz
+
+    orh $a0, $zero, .hi16 volver_inicio
+    ori $a0, $a0, .lo16 volver_inicio
+    jal imprimir_asciiz
+
+    orh $12, $zero, .hi16 pos_y
+    ori $12, $12, .lo16 pos_y
+    lw $13, 0($12)
+bucle_y:
+    beq $13, $zero, fin_y
+    orh $a0, $zero, .hi16 salto_linea
+    ori $a0, $a0, .lo16 salto_linea
+    jal imprimir_asciiz
+    addi $13, $13, -1
+    j bucle_y
+fin_y:
+
+    orh $10, $zero, .hi16 pos_x
+    ori $10, $10, .lo16 pos_x
+    lw $11, 0($10)
+bucle_x:
+    beq $11, $zero, fin_x
+    orh $a0, $zero, .hi16 espacio
+    ori $a0, $a0, .lo16 espacio
+    jal imprimir_asciiz
+    addi $11, $11, -1
+    j bucle_x
+fin_x:
+
+    orh $a0, $zero, .hi16 cabeza_snake
+    ori $a0, $a0, .lo16 cabeza_snake
+    jal imprimir_asciiz
+
+    orh $14, $zero, 0x0000
+    ori $14, $14, 0x0020
+delay_loop:
+    addi $14, $14, -1
+    bne $14, $zero, delay_loop
+
+    j game_loop
+
+game_win:
+    orh $a0, $zero, .hi16 limpiar_pantalla
+    ori $a0, $a0, .lo16 limpiar_pantalla
+    jal imprimir_asciiz
+    orh $a0, $zero, .hi16 mensaje_win
+    ori $a0, $a0, .lo16 mensaje_win
+    jal imprimir_asciiz
+freeze_win:
+    j freeze_win
+
+game_over:
+    orh $a0, $zero, .hi16 limpiar_pantalla
+    ori $a0, $a0, .lo16 limpiar_pantalla
+    jal imprimir_asciiz
+    orh $a0, $zero, .hi16 mensaje_fin
+    ori $a0, $a0, .lo16 mensaje_fin
+    jal imprimir_asciiz
+freeze_over:
+    j freeze_over
+
+imprimir_asciiz:
+    addi $sp, $sp, -12
+    sw $s0, 0($sp)
+    sw $s1, 4($sp)
+    sw $s2, 8($sp)
+    addi $s0, $a0, 0
+    addi $s2, $zero, -0x100
+imprimir_asciiz.bucle:
+    lbu $s1, 0($s0)
+    beq $s1, $zero, imprimir_asciiz.salir
+    sb $s1, 0($s2)
+    addi $s0, $s0, 1
+    j imprimir_asciiz.bucle
+imprimir_asciiz.salir:
+    lw $s0, 0($sp)
+    lw $s1, 4($sp)
+    lw $s2, 8($sp)
+    addi $sp, $sp, 12
+    jr $ra, 0
+
+leer_teclado:
+    addi $10, $zero, -0x100
+    lw $11, 4($10)
+    addi $12, $zero, 1
+    and $11, $11, $12
+    beq $11, $zero, leer_teclado.vacio
+    lbu $8, 0($10)
+    jr $ra, 0
+leer_teclado.vacio:
+    addi $8, $zero, 0
+    jr $ra, 0
