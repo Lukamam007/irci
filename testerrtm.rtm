@@ -1,0 +1,63 @@
+.section ".data"
+cadena: .asciiz "arquitectura de computadoras"
+objetivo: .byte 97
+salida: .asciiz "Resultado: "
+salto: .asciiz "\r\n"
+
+.section ".text"
+addi $sp, $zero, 0xFFC
+
+orh $t0, $zero, .hi16 cadena
+ori $t0, $t0, .lo16 cadena
+
+orh $t1, $zero, .hi16 objetivo
+ori $t1, $t1, .lo16 objetivo
+lbu $t1, 0($t1)
+
+addi $t2, $zero, 0
+
+bucle_conteo:
+    lbu $t3, 0($t0)
+    beq $t3, $zero, fin_conteo
+    bne $t3, $t1, siguiente_char
+    addi $t2, $t2, 1
+
+siguiente_char:
+    addi $t0, $t0, 1
+    j bucle_conteo
+
+fin_conteo:
+    orh $a0, $zero, .hi16 salida
+    ori $a0, $a0, .lo16 salida
+    jal imprimir_asciiz
+
+    addi $t2, $t2, 48
+    addi $t0, $zero, -0x100
+    sb $t2, 0($t0)
+
+    orh $a0, $zero, .hi16 salto
+    ori $a0, $a0, .lo16 salto
+    jal imprimir_asciiz
+
+detener:
+    j detener
+
+imprimir_asciiz:
+    addi $sp, $sp, -12
+    sw $s0, 0($sp)
+    sw $s1, 4($sp)
+    sw $s2, 8($sp)
+    addi $s0, $a0, 0
+    addi $s2, $zero, -0x100
+imprimir_asciiz.bucle:
+    lbu $s1, 0($s0)
+    beq $s1, $zero, imprimir_asciiz.salir
+    sb $s1, 0($s2)
+    addi $s0, $s0, 1
+    j imprimir_asciiz.bucle
+imprimir_asciiz.salir:
+    lw $s0, 0($sp)
+    lw $s1, 4($sp)
+    lw $s2, 8($sp)
+    addi $sp, $sp, 12
+    jr $ra, 0
